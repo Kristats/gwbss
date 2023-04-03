@@ -6,6 +6,7 @@ library('sf')
 library("GWmodel")
 source("utils.R")
 source("gwbss.R")
+library('abind')
 
 # data 
 data("moss")
@@ -48,6 +49,10 @@ pca_res <- princomp(d1s@data, )
 gwbss_res_1 <- gwbss(x = elems_ilr, coords = coords, bw = 100000, scatter = "1")
 gwbss_res_2 <- gwbss(x = elems_ilr, coords = coords, bw = 100000, scatter = "2")
 
+#gwbss_res_2 <- gwbss2(x =  elems_ilr, coords = coords, bw = 100000, kernel_type = "ball", kernel_parameters = bw,
+#                            spatial_type = list(spatial_mean = TRUE, spatial_scores = TRUE))
+
+
 # scores plots
 ic_idx <- 1
 plot_map(coords_ll, sbss_res$s[, ic_idx], map = kola_map, quant = TRUE)
@@ -66,3 +71,9 @@ ic_idx <- 2
 plot_map(coords_ll, sbss_res$s[, ic_idx], map = kola_map, quant = TRUE)
 plot_map(coords_ll, gwbss_res_1$s[, ic_idx], map = kola_map, quant = TRUE)
 plot_map(coords_ll, gwbss_res_2$s[, ic_idx], map = kola_map, quant = TRUE)
+
+
+# winnig loadings
+ic_idx <- 1
+plot_map(coords_ll, apply(gwbss_res_1$loadings,1,function(A){ which.max(A[,ic_idx]) }), map = kola_map, quant = FALSE)
+plot_map(coords_ll, apply(gwbss_res_2$loadings,1,function(A){ which.max(A[,ic_idx]) }), map = kola_map, quant = FALSE)
