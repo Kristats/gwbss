@@ -7,6 +7,7 @@ library("GWmodel")
 source("utils.R")
 source("gwbss.R")
 library('abind')
+library(gridExtra)
 
 # data 
 data("moss")
@@ -36,6 +37,9 @@ c_mat <- contras_mat(elems)
 elems_ilr <- log(elems) %*% c_mat
 
 # kernel definition
+k_mat <- SpatialBSS::spatial_kernel_matrix(coords = coords, 
+                                           kernel_type = "ring", kernel_parameters = c(0, 50000))
+lcov <- SpatialBSS::local_covariance_matrix(x = elems_ilr, kernel_list = k_mat)
 sbss_res <- SpatialBSS:::sbss.default(x = elems_ilr, coords = coords, 
                                       kernel_type = "ring", kernel_parameters = c(0, 50000))
 
@@ -46,14 +50,22 @@ bw <- GWmodel::bw.gwpca(d1s, vars=colnames(d1s@data), kernel = "gaussian")
 gwpca_res <- gwpca(d1s, vars=colnames(d1s@data), kernel = "gaussian", bw = 50000, scores = TRUE)
 pca_res <- princomp(d1s@data, )
 
-gwbss_res_1 <- gwbss(x = elems_ilr, coords = coords, bw = 100000, scatter = "1")
-gwbss_res_2 <- gwbss(x = elems_ilr, coords = coords, bw = 100000, scatter = "2")
 
-#gwbss_res_2 <- gwbss2(x =  elems_ilr, coords = coords, bw = 100000, kernel_type = "ball", kernel_parameters = bw,
-#                            spatial_type = list(spatial_mean = TRUE, spatial_scores = TRUE))
+gwbss_res_cm <- gwbss(x = elems_ilr, coords = coords, bw = 100000, scatter = "2")
+
+gwbss_res_cr <- gwbss2(x = elems_ilr, coords = coords, bw = 100000,
+                           spatial_type = list(spatial_mean = TRUE, spatial_scores = TRUE))
 
 
 # scores plots
+pcm1 = plot_map(coords_ll, gwbss_res_cm$s[, 1], map = kola_map, quant = FALSE, title = "cm1")
+pcr1 = plot_map(coords_ll, gwbss_res_cr$s[, 1], map = kola_map, quant = FALSE, title = "cr1")
+
+pcm2 = plot_map(coords_ll, gwbss_res_cm$s[, 2], map = kola_map, quant = FALSE, title = "cm2")
+pcr2 = plot_map(coords_ll, gwbss_res_cr$s[, 2], map = kola_map, quant = FALSE, title = "cr2")
+
+grid.arrange(pcm1,pcm2,pcr1,pcr2,nrow =2)
+
 ic_idx <- 1
 plot_map(coords_ll, sbss_res$s[, ic_idx], map = kola_map, quant = TRUE)
 plot_map(coords_ll, gwbss_res_1$s[, ic_idx], map = kola_map, quant = TRUE)
@@ -64,8 +76,10 @@ plot_map(coords_ll, a[, ic_idx], map = kola_map, quant = TRUE)
 plot_map(coords_ll, -pca_res$scores[, ic_idx], map = kola_map, quant = TRUE)
 
 
-plot_map(coords_ll, gwbss_res_1$d[, ic_idx], map = kola_map, quant = FALSE)
-plot_map(coords_ll, gwbss_res_2$d[, ic_idx], map = kola_map, quant = FALSE)
+plot_map(coords_ll, gwbss_res_2$d[, 1], map = kola_map, quant = FALSE)
+plot_map(coords_ll, gwbss_res_2$d[, 2], map = kola_map, quant = FALSE)
+plot_map(coords_ll, gwbss_res_2$d[, 3], map = kola_map, quant = FALSE)
+plot_map(coords_ll, gwbss_res_2$d[, 4], map = kola_map, quant = FALSE)
 
 ic_idx <- 2
 plot_map(coords_ll, sbss_res$s[, ic_idx], map = kola_map, quant = TRUE)

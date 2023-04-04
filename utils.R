@@ -14,7 +14,7 @@ clr_func <- function(x) {
   return(t(x_clr))
 }
 
-plot_map <- function(coords, variable, map, quant = TRUE) {
+plot_map <- function(coords, variable, map, quant = TRUE, title = "") {
   
   x <- data.frame(x = coords[, 1], y = coords[, 2], variable = variable) 
   
@@ -77,6 +77,7 @@ plot_map <- function(coords, variable, map, quant = TRUE) {
       theme(legend.text = element_text(angle = 45)) +
       theme(legend.text = element_text(size = 11))
   }
+  g <- g + ggtitle(title)
   plot(g)
   return(g)
 }
