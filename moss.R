@@ -7,7 +7,7 @@ library("GWmodel")
 source("utils.R")
 source("gwbss.R")
 library('abind')
-library(gridExtra)
+library("gridExtra")
 
 # data 
 data("moss")
@@ -36,12 +36,38 @@ c_mat <- contras_mat(elems)
 
 elems_ilr <- log(elems) %*% c_mat
 
-# kernel definition
-k_mat <- SpatialBSS::spatial_kernel_matrix(coords = coords, 
-                                           kernel_type = "ring", kernel_parameters = c(0, 50000))
-lcov <- SpatialBSS::local_covariance_matrix(x = elems_ilr, kernel_list = k_mat)
+# apply gwbss
+bw <- 100000
+
+gwbss_res_1 <- gwbss(x = elems_ilr, coords = coords, bw = bw, 
+                     spatial_mean = TRUE, 
+                     S2_type = "scov",
+                     field_order = "gwica")
+gwbss_res_2 <- gwbss(x = elems_ilr, coords = coords, bw = bw, 
+                     spatial_mean = FALSE, 
+                     S2_type = "vario",
+                     field_order = "gwica")
+gwbss_res_3 <- gwbss(x = elems_ilr, coords = coords, bw = bw, 
+                     spatial_mean = TRUE, 
+                     S2_type = "sbssw",
+                     field_order = "gwica")
+gwbss_res_4 <- gwbss(x = elems_ilr, coords = coords, bw = bw, 
+                     spatial_mean = TRUE, 
+                     S2_type = "sfobi",
+                     field_order = "gwica")
+
+# apply sbss
 sbss_res <- SpatialBSS:::sbss.default(x = elems_ilr, coords = coords, 
-                                      kernel_type = "ring", kernel_parameters = c(0, 50000))
+                                      kernel_type = "ring", kernel_parameters = c(0, bw))
+
+# plots
+idx <- 2
+g_scov <- plot_map(coords_ll, gwbss_res_1$s[, idx], map = kola_map, quant = TRUE, title = "scov")
+g_vario <- plot_map(coords_ll, gwbss_res_2$s[, idx], map = kola_map, quant = TRUE, title = "vario")
+g_sbssw <- plot_map(coords_ll, gwbss_res_3$s[, idx], map = kola_map, quant = TRUE, title = "sbssw")
+g_sfobi <- plot_map(coords_ll, gwbss_res_4$s[, idx], map = kola_map, quant = TRUE, title = "sfobi")
+grid.arrange(g_scov, g_vario, g_sbssw, g_sfobi, nrow = 2)
+
 
 
 
