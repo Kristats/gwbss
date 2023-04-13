@@ -41,15 +41,15 @@ bw <- 100000
 
 gwbss_res_1 <- gwbss(x = elems_ilr, coords = coords, bw = bw, 
                      spatial_mean = TRUE, 
-                     S2_type = "scov",
+                     S2_type = "wcov",
                      field_order = "gwica")
 gwbss_res_2 <- gwbss(x = elems_ilr, coords = coords, bw = bw, 
                      spatial_mean = FALSE, 
-                     S2_type = "vario",
+                     S2_type = "wvario",
                      field_order = "gwica")
 gwbss_res_3 <- gwbss(x = elems_ilr, coords = coords, bw = bw, 
-                     spatial_mean = TRUE, 
-                     S2_type = "sbssw",
+                     spatial_mean = FALSE, 
+                     S2_type = "wgraph",
                      field_order = "gwica")
 gwbss_res_4 <- gwbss(x = elems_ilr, coords = coords, bw = bw, 
                      spatial_mean = TRUE, 
@@ -61,11 +61,11 @@ sbss_res <- SpatialBSS:::sbss.default(x = elems_ilr, coords = coords,
                                       kernel_type = "ring", kernel_parameters = c(0, bw))
 
 # plots
-idx <- 2
-g_scov <- plot_map(coords_ll, gwbss_res_1$s[, idx], map = kola_map, quant = TRUE, title = "scov")
-g_vario <- plot_map(coords_ll, gwbss_res_2$s[, idx], map = kola_map, quant = TRUE, title = "vario")
-g_sbssw <- plot_map(coords_ll, gwbss_res_3$s[, idx], map = kola_map, quant = TRUE, title = "sbssw")
-g_sfobi <- plot_map(coords_ll, gwbss_res_4$s[, idx], map = kola_map, quant = TRUE, title = "sfobi")
+idx <- 5
+g_scov <- plot_map(coords_ll, gwbss_res_1$s[, idx], map = kola_map, quant = TRUE, title = "wcov")
+g_vario <- plot_map(coords_ll, gwbss_res_2$s[, idx], map = kola_map, quant = TRUE, title = "wvario")
+g_sbssw <- plot_map(coords_ll, gwbss_res_3$s[, idx], map = kola_map, quant = TRUE, title = "wgraph")
+g_sfobi <- plot_map(coords_ll, sbss_res$s[, idx], map = kola_map, quant = TRUE, title = "sbss")
 grid.arrange(g_scov, g_vario, g_sbssw, g_sfobi, nrow = 2)
 
 

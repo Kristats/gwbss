@@ -31,47 +31,50 @@ S1 <- function(dat, wt, eps){
 }
 
 
-# covariance scatter to s'
-S2_scov <- function(dat, xi, wt, eps){
-  
-  # only positive weights
-  use <- abs(wt) > eps
-  wt  <- wt[use]
-  dat_w <- dat[use, ]
-  dat_w <- sweep(dat_w, 1, wt / sum(wt), "*")
-  
-  # calculate scatter
-  s <- do.call(rbind,
-                lapply(xi, function(xi) colSums(xi * dat_w)))
-  s <- (s + t(s)) / 2
 
-  return(s)
-}
-
-# variogram scatter with center s'
-S2_vario <- function(dat, xi, wt, eps){
-  
-  # only positive weights
-  use <- abs(wt) > eps
-  wt  <- wt[use]
-  dat_w <- dat[use, ]
-  dat_w <- - sweep(dat_w, 2, xi, "-")
-  dat_w <- sweep(dat_w, 1, sqrt(wt / sum(wt)), "*")
-  
-  # calculate scatter
-  s <- t(dat_w) %*% dat_w 
-  
-  return(s)
-}
 
 # sbss scatter with square root weights transformed data 
-S2_sbssw <- function(dat, k_mat, wt, eps){
+S2_wcov <- function(dat, k_mat, wt, eps){
   
   # only positive weights
   n <- nrow(dat)
   use <- abs(wt) > eps
   wt  <- wt[use]
   dat_w <- dat[use, ]
+  dat_w <- sweep(dat_w, 1, sqrt(wt / sum(wt)), "*")
+  
+  # compute spatial scatter
+  s <- t(dat_w) %*% k_mat[use, use] %*% dat_w 
+  
+  return(s)
+}
+
+# sbss scatter with square root weights transformed data 
+S2_wvario <- function(dat, k_mat, wt, eps){
+  
+  # only positive weights
+  n <- nrow(dat)
+  use <- abs(wt) > eps
+  rhot  <- k_mat[use, use] %*% sqrt(wt / sum(wt))
+  dat_w <- dat[use, ]
+  dat_w <- sweep(dat_w, 1, rhot * sqrt(wt / sum(wt)), "*")
+  
+  # compute spatial scatter
+  s <- 2 * t(dat_w) %*% dat_w -
+    2 * S2_wcov(dat, k_mat, wt, eps)
+
+  return(s)
+}
+
+# sbss scatter with square root weights transformed data 
+S2_wgraph <- function(dat, k_mat, xi, wt, eps){
+  
+  # only positive weights
+  n <- nrow(dat)
+  use <- abs(wt) > eps
+  wt  <- wt[use]
+  dat_w <- dat[use, ]
+  dat_w <- sweep(dat_w, 2, xi, "-")
   dat_w <- sweep(dat_w, 1, sqrt(wt / sum(wt)), "*")
   
   # compute spatial scatter
@@ -95,7 +98,7 @@ S2_sfobi <- function(dat, wt, eps){
   return(s)
 }
 
-gwbss <- function(x, coords, bw, spatial_mean = TRUE, S2_type = c("scov", "vario", "sbssw", "sfobi"),
+gwbss <- function(x, coords, bw, spatial_mean = TRUE, S2_type = c("wcov", "wvario", "wgraph", "sfobi"),
                   field_order = c("gwpca", "gwica"), kernel_type = "ball", kernel_parameters = bw) {
   # init
   S2_type <- match.arg(S2_type)
@@ -128,31 +131,43 @@ gwbss <- function(x, coords, bw, spatial_mean = TRUE, S2_type = c("scov", "vario
   x_wh <- lapply(seq_len(n), function(idx) x_cen %*% S1_invsq[[idx]]$mat)
   
   # compute and diagonalize second scatter
-  if (S2_type == "scov") {
+  k_mat <- SpatialBSS::spatial_kernel_matrix(coords, kernel_type = kernel_type,
+                                             kernel_parameters = kernel_parameters)[[1]]
+  if (S2_type == "wcov") {
     S2_diago <- lapply(seq_len(n), function(idx) { 
-      s2 <- list(S2_scov(x_wh[[idx]], x_wh[[idx]][idx, ], weights[idx, ], eps)) 
+      s2 <- list(S2_wcov(x_wh[[idx]], k_mat, weights[idx, ], eps)) 
+      attr(s2, "lcov") <- "lcov"
+      SpatialBSS:::diag_scatters(s2, ordered = TRUE)
+    })
+  } else if (S2_type == "wvario") {
+    S2_diago <- lapply(seq_len(n), function(idx) { 
+      s2 <- list(S2_wvario(x_wh[[idx]], k_mat, weights[idx, ], eps)) 
       attr(s2, "lcov") <- "lcov"
       SpatialBSS:::diag_scatters(s2, ordered = FALSE)
     })
-  } else if(S2_type == "vario") {
+    S2_diago <- lapply(S2_diago, function(S2) { 
+      ord <- order(diag(S2$d), decreasing = FALSE)
+      S2$u <- S2$u[, ord]
+      S2$d <- S2$d[ord, ord]
+      S2
+    })
+  } else if (S2_type == "wgraph") {
     S2_diago <- lapply(seq_len(n), function(idx) { 
-      s2 <- list(S2_vario(x_wh[[idx]], x_wh[[idx]][idx, ], weights[idx, ], eps)) 
+      s2 <- list(S2_wgraph(x_wh[[idx]], k_mat, x_wh[[idx]][idx, ], weights[idx, ], eps)) 
       attr(s2, "lcov") <- "lcov"
       SpatialBSS:::diag_scatters(s2, ordered = FALSE)
     })
-  } else if(S2_type == "sbssw") {
-    k_mat <- as.matrix(SpatialBSS::spatial_kernel_matrix(coords, kernel_type = kernel_type, 
-                                                         kernel_parameters = kernel_parameters)[[1]])
-    S2_diago <- lapply(seq_len(n), function(idx) { 
-      s2 <- list(S2_sbssw(x_wh[[idx]], k_mat, weights[idx, ], eps)) 
-      attr(s2, "lcov") <- "lcov"
-      SpatialBSS:::diag_scatters(s2, ordered = FALSE)
+    S2_diago <- lapply(S2_diago, function(S2) { 
+      ord <- order(diag(S2$d), decreasing = FALSE)
+      S2$u <- S2$u[, ord]
+      S2$d <- S2$d[ord, ord]
+      S2
     })
   } else if (S2_type == "sfobi") {
     S2_diago <- lapply(seq_len(n), function(idx) { 
       s2 <- list(S2_sfobi(x_wh[[idx]], weights[idx, ], eps)) 
       attr(s2, "lcov") <- "lcov"
-      SpatialBSS:::diag_scatters(s2, ordered = FALSE)
+      SpatialBSS:::diag_scatters(s2, ordered = TRUE)
     })
   }
  
@@ -163,13 +178,6 @@ gwbss <- function(x, coords, bw, spatial_mean = TRUE, S2_type = c("scov", "vario
       S2_diago[[idx]]$u <- S2_diago[[idx]]$u[, ord]
       S2_diago[[idx]]$d <- S2_diago[[idx]]$d[ord, ord]
       S2_diago[[idx]]
-    })
-  } else if (field_order == "gwica") {
-    S2_diago <- lapply(S2_diago, function(S2) { 
-      ord <- order(diag(S2$d), decreasing = TRUE)
-      S2$u <- S2$u[, ord]
-      S2$d <- S2$d[ord, ord]
-      S2
     })
   }
 
@@ -187,8 +195,8 @@ gwbss <- function(x, coords, bw, spatial_mean = TRUE, S2_type = c("scov", "vario
   scores <- do.call("rbind", scores)
 
   # eigvalues
-  d <- lapply(seq_len(n),function(idx) as.vector(diag(S2_diago[[idx]]$d)))
-  d <- do.call("rbind",d)
+  d <- lapply(seq_len(n), function(idx) as.vector(diag(S2_diago[[idx]]$d)))
+  d <- do.call("rbind", d)
   
   return(list(s = scores, loadings = loadings, d = d, gwmeans = cen))
 }

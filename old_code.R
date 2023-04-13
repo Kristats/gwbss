@@ -75,3 +75,36 @@ gwbss <- function(x, coords, bw, scatter = c("1", "2"), kernel_type = "ball", ke
 
   return(list(s = scores, loadings = loadings, d = d, gwmeans = gwmeans))
 }
+
+# covariance scatter to s'
+S2_scov <- function(dat, xi, wt, eps){
+  
+  # only positive weights
+  use <- abs(wt) > eps
+  wt  <- wt[use]
+  dat_w <- dat[use, ]
+  dat_w <- sweep(dat_w, 1, wt / sum(wt), "*")
+  
+  # calculate scatter
+  s <- do.call(rbind,
+               lapply(xi, function(xi) colSums(xi * dat_w)))
+  s <- (s + t(s)) / 2
+  
+  return(s)
+}
+
+# variogram scatter with center s'
+S2_vario <- function(dat, xi, wt, eps){
+  
+  # only positive weights
+  use <- abs(wt) > eps
+  wt  <- wt[use]
+  dat_w <- dat[use, ]
+  dat_w <- - sweep(dat_w, 2, xi, "-")
+  dat_w <- sweep(dat_w, 1, sqrt(wt / sum(wt)), "*")
+  
+  # calculate scatter
+  s <- t(dat_w) %*% dat_w 
+  
+  return(s)
+}
