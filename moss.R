@@ -9,6 +9,17 @@ source("gwbss.R")
 library('abind')
 library("gridExtra")
 
+
+# TODO:
+#
+# Make plot for each method and then plot scores, plot winning loadings and Eigenvalues
+# for given component
+# Also make MD plot || Sigma^-1* Sigma_k - I || where Sigma_k is unmixing matrix at point k for method
+#
+
+
+
+
 # data 
 data("moss")
 
@@ -61,7 +72,7 @@ sbss_res <- SpatialBSS:::sbss.default(x = elems_ilr, coords = coords,
                                       kernel_type = "ring", kernel_parameters = c(0, bw))
 
 # plots
-idx <- 5
+idx <- 4
 g_scov <- plot_map(coords_ll, gwbss_res_1$s[, idx], map = kola_map, quant = TRUE, title = "wcov")
 g_vario <- plot_map(coords_ll, gwbss_res_2$s[, idx], map = kola_map, quant = TRUE, title = "wvario")
 g_sbssw <- plot_map(coords_ll, gwbss_res_3$s[, idx], map = kola_map, quant = TRUE, title = "wgraph")
