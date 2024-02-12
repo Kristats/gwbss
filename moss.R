@@ -8,6 +8,7 @@ source("utils.R")
 source("gwbss.R")
 library('abind')
 library("gridExtra")
+library("osmdata")
 
 
 # TODO:
@@ -16,8 +17,6 @@ library("gridExtra")
 # for given component
 # Also make MD plot || Sigma^-1* Sigma_k - I || where Sigma_k is unmixing matrix at point k for method
 #
-
-
 
 
 # data 
@@ -36,6 +35,15 @@ kola_map <- get_stamenmap(bbox = unname(st_bbox(coords_sf)),
                           maptype = 'terrain-background', 
                           zoom = 7,
                           crop = TRUE)
+
+get_map(location = unname(st_bbox(coords_sf)), 
+        scale = "auto",
+        zoom = 7,
+        source = "stadia")
+
+lagos_bb <- getbb("Lagos")
+lagos_bb
+
 
 vars <- c("Ag","Al","As","B","Ba","Bi","Ca","Cd","Co","Cr","Cu","Fe","Hg","K","Mg","Mn","Mo",
           "Na","Ni","P","Pb","Rb","S","Sb","Si","Sr","Th","Tl","U","V","Zn")
