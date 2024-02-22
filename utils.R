@@ -62,13 +62,13 @@ plot_map <- function(coords, variable, map, quant = TRUE, title = "") {
   } else {
     g <- ggmap::ggmap(map,
                       base_layer = ggplot(aes(x = x, y = y, color = variable), data = x)) + 
-      geom_point(alpha=1) +
+      geom_point(alpha=1, size = 3) +
       theme_bw() +
       xlab(expression("Longitude"*~degree*W)) +
       ylab(expression("Latitude"*~degree*N)) +
       theme(legend.position = "bottom") +
       #scale_color_gradientn(colours = terrain.colors(7)) +
-      scale_color_gradientn(colours = colorspace::diverge_hcl(7)) + 
+      #scale_color_gradientn(colours = colorspace::diverge_hcl(7)) + 
       #scale_colo_continuous_diverging() +
       #scale_colour_gradientn(colours =rainbow(7))	+
       #scale_colour_gradientn(low = "grey", high = "brown") + 
