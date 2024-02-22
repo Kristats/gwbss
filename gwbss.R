@@ -608,7 +608,7 @@ grabss <- function(x,
   dists <- distances(graph.ob, mode = "all")
   rho_mat <- dists / max(dists)
   sig   <- stats::quantile(rho_mat, probs = 0.9)
-  rho_mat <- exp(- rho_mat / sig)
+  rho_mat <- exp(- rho_mat^2 / sig^2 * 1 / 2)
   
   # names
   varnames <- if(!is.null(colnames(x))){ colnames(x) }else{ as.character(1:p) }
@@ -645,14 +645,15 @@ grabss <- function(x,
   x_wh <- lapply(seq_len(n), function(idx) x_cen[[idx]] %*% S1_invsq[[idx]]$mat)
   
   # gamma matrix - how far we go from s  
-  gamma_mat <- 1 * (dists <= nbr_nns)
+  gamma_mat <- Matrix(1 * (dists <= nbr_nns))
   
   # compute L(s) or W(s)
   Localmats <-  if(spatial_laplacian){
                      if(!is.null(gfun)){ message("g can only be used with sptial_laplacian = FALSE")}
                      lapply(seq_len(n), function(idx){ 
-                                W_loc <-  outer(rho_mat[idx,], rho_mat[idx,], FUN = "*") * gamma_mat
-                                if(laplacian){ diag(rowSums(W_loc)) - W_loc }else{ W_loc }
+                                W_loc <-  Matrix(outer(rho_mat[idx,], rho_mat[idx,], FUN = "*")) * gamma_mat
+                                A_loc <- if(laplacian){ diag(rowSums(W_loc)) - W_loc }else{ W_loc }
+                                Matrix(A_loc)
                             })  
                 }else{
                   W_gl <-  rho_mat * gamma_mat
@@ -660,8 +661,6 @@ grabss <- function(x,
                   A_gl <- if(!is.null(gfun)){ gA(A_gl, function(x){gfun(x)})}else{ A_gl }
                   lapply(seq_len(n), function(idx){ A_gl })
                 }
-
-  
   
   # compute scatters
   S2_diago <- lapply(1:n, function(idx){ 

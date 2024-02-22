@@ -12,6 +12,8 @@ library("pheatmap")
 library("JADE")
 source("utils.R")
 source("gwbss.R")
+library("Matrix")
+
 
 # data 
 data("moss")
@@ -65,7 +67,7 @@ elems_log  <- scale(elems_log, center = TRUE, scale = TRUE)
 
 # apply gwbss
 bw <- 100000
-graph.obj <- nng(x = as.matrix(stats::dist(coords)), k = 40, mutual = FALSE)
+graph.obj <- nng(x = as.matrix(stats::dist(coords)), k = 10, mutual = FALSE)
 weights_adj <- as.matrix(as_adjacency_matrix(graph.obj))
 weights_adj <- weights_adj + t(weights_adj)
 weights_adj[weights_adj!=0] = 1
@@ -448,9 +450,9 @@ gwbss_res_1 <- grabss(x = elems_log,
                       spatial_cov = FALSE, 
                       laplacian = TRUE,
                       spatial_laplacian = TRUE,
-                      gfun = function(x){(x)^2})
+                      gfun = function(x){x})
 plot_map(coords_ll, gwbss_res_1$scores_global[,2], map = kola_map, quant = TRUE, title = "L")
 plot_map(coords_ll, gwbss_res_1$scores_edges[,20,1], map = kola_map, quant = TRUE, title = "L")
 plot_map(coords_ll, gwbss_res_1$scores_edges[20,,1], map = kola_map, quant = TRUE, title = "L")
 
-
+round(gwbss_res_1$unmixing_global,2)
