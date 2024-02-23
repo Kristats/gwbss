@@ -596,6 +596,7 @@ grabss <- function(x,
                   spatial_cov = TRUE, 
                   laplacian = TRUE,
                   spatial_laplacian = TRUE,
+                  gammam = c("rho","unit"),
                   gfun = NULL){
   # init
   n <- nrow(x)
@@ -605,9 +606,11 @@ grabss <- function(x,
   
   # compute distances
   graph.ob <- graph_from_adjacency_matrix(weights_adj, weighted = TRUE)
-  dists <- distances(graph.ob, mode = "all")
+  dists <- distances(graph.ob, mode = "all", algorithm = "dijkstra")
+  dists[is.infinite(dists)] <- 0
   rho_mat <- dists / max(dists)
-  sig   <- stats::quantile(rho_mat, probs = 0.9)
+  #sig     <- stats::quantile(rho_mat, probs = 0.9)
+  sig <- mad(rho_mat)#
   rho_mat <- exp(- rho_mat^2 / sig^2 * 1 / 2)
   
   # names
@@ -630,30 +633,34 @@ grabss <- function(x,
   
   ### compute S1s
   if(spatial_cov){
-    S1s <- lapply(seq_len(n), function(idx){ S1(x_cen[[idx]], weights_adj[idx, ], eps) })
+    S1s <- lapply(seq_len(n), function(idx){ S1(x_cen[[idx]], rho_mat[idx, ], eps) })
   }else{
     cen_gl <- glb_center(x)
     s1  <- S1(x - cen_gl, rep(1,n), eps)
     S1s <- lapply(seq_len(n), function(idx){ s1 })
   }
-  
-  
+
   # sqrt inverse of first scatter
   S1_invsq <- lapply(seq_len(n), function(idx){ gpower(S1s[[idx]], - 1 / 2)  })
   
   ## whiten data 
   x_wh <- lapply(seq_len(n), function(idx) x_cen[[idx]] %*% S1_invsq[[idx]]$mat)
   
-  # gamma matrix - how far we go from s  
-  gamma_mat <- Matrix(1 * (dists <= nbr_nns))
+  # gamma matrix - how far we go from s
+  if(gammam == "rho"){ 
+    gamma_mat <- Matrix(rho_mat)  
+  }else if(gammam == "unit"){
+    gamma_mat <- Matrix(1 * (dists <= nbr_nns)) 
+  }
   
   # compute L(s) or W(s)
   Localmats <-  if(spatial_laplacian){
                      if(!is.null(gfun)){ message("g can only be used with sptial_laplacian = FALSE")}
                      lapply(seq_len(n), function(idx){ 
+                                #W_loc <- gamma_mat * rho_mat[idx,]
                                 W_loc <-  Matrix(outer(rho_mat[idx,], rho_mat[idx,], FUN = "*")) * gamma_mat
                                 A_loc <- if(laplacian){ diag(rowSums(W_loc)) - W_loc }else{ W_loc }
-                                Matrix(A_loc)
+                                Matrix(A_loc) 
                             })  
                 }else{
                   W_gl <-  rho_mat * gamma_mat
@@ -664,7 +671,7 @@ grabss <- function(x,
   
   # compute scatters
   S2_diago <- lapply(1:n, function(idx){ 
-                   s2 <- 1 / n * t(x_wh[[idx]]) %*% Localmats[[idx]] %*% x_wh[[idx]]
+                   s2 <- 1 / n * t(x_wh[[idx]]) %*% Localmats[[idx]] %*% x_wh[[idx]] 
                    eig <- eigen(s2, symmetric = TRUE)
                    if(laplacian){ inds <- (p-1):1 }else{ inds <- p:1 }
                    list(u = eig$vectors[,inds], d = eig$values[inds])
@@ -718,7 +725,8 @@ grabss <- function(x,
               eigenvalues = d, 
               centers = cen, 
               winningloading = winningloading,
-              orderedloadings = orderedloadings))
+              orderedloadings = orderedloadings,
+              dists = dists))
 }
 
 

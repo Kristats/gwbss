@@ -10,9 +10,228 @@ library("osmdata")
 library("cccd")
 library("pheatmap")
 library("JADE")
+library("Matrix")
+library("factoextra")
+library("OpenStreetMap")
+
+
 source("utils.R")
 source("gwbss.R")
-library("Matrix")
+
+
+
+
+# data
+# gemas
+vars  = c("Al","Ba","Ca","Cr","Fe","K","Mg","Mn","Na","Nb","P","Si","Sr","Ti","V" ,"Y","Zn","Zr")
+
+x = robCompositions::gemas
+x = x[-170,]
+countries =  unique(robCompositions::gemas$COUNTRY)
+cntryidx = which(x$COUNTRY %in%  countries)
+cntryidx <- which(x$COUNTRY %in% c("GER","SPA","ITA","AUS","FRA","PTG","DEN","BEL","NEL"))#c("FIN","SWE","DEN","NOR")) 
+x = x[cntryidx,]
+
+
+# get subsets
+x[is.na(x)] = 0
+p = length(vars)
+elems = as.matrix(x[, vars])
+
+# map info
+coords = as.matrix(x[, c("longitude","latitude")])
+row.names(coords) = NULL
+coords_sf = sf::st_as_sf(data.frame(coords), 
+                          coords = c(1,2))
+coords_ll =  st_coordinates(coords_sf)
+bbox   = unname(st_bbox(coords_sf)) + c(2,-4,-1,3.5)
+
+map_df <- openmap(c(bbox[4],bbox[1]),c(bbox[2],bbox[3]), type = "esri-physical")
+plot(map_df)
+
+
+
+elems_log <- log(elems)
+colnames(elems_log) <- vars
+elems_log  <- t(scale(t(elems_log), center = TRUE, scale = FALSE))
+elems_log  <- scale(elems_log, center = TRUE, scale = TRUE)
+#colnames(elems_log) <- 1:ncol(elems_log)
+
+# apply gwbss
+graph.obj <- nng(x = as.matrix(stats::dist(coords)), k = 30, mutual = FALSE)
+weights_adj <- as.matrix(as_adjacency_matrix(graph.obj))
+weights_adj <- weights_adj + t(weights_adj)
+weights_adj[weights_adj!=0] = 1
+
+# weights_adj <- GWmodel::gw.weight(as.matrix(dist(coords)), bw = bw, kernel = "gaussian", adaptive = FALSE)
+# 
+# weights_adj <- t(apply(weights_adj, 1, function(u){ 
+#   u[u < quantile(u,0.75)] <-0
+#   return(u)}))
+# weights_adj = 0.5*(weights_adj + t(weights_adj))
+
+  
+#weights_adj <- SpatialBSS::spatial_kernel_matrix(coords, kernel_type = "ball",
+#                                  kernel_parameters = 1.5)[[1]]
+
+graph.ob <- graph_from_adjacency_matrix(weights_adj, weighted = TRUE)
+dists <- distances(graph.ob, mode = "all", algorithm = "dijkstra")
+hist(dists)
+
+nbr_nns <- 5
+gwbss_res_1 <- grabss(x = elems_log, 
+                      weights_adj,
+                      nbr_nns = nbr_nns,
+                      spatial_mean = FALSE,
+                      spatial_cov = TRUE, 
+                      laplacian   = TRUE,
+                      spatial_laplacian = TRUE,
+                      gammam = "unit",
+                      gfun = NULL)
+
+
+
+idx <- 1
+plot_map(coords_ll, gwbss_res_1$scores_global[,1], map = map_df, quant = TRUE, title = "L")
+plot_map(coords_ll, gwbss_res_1$scores_global[,2], map = map_df, quant = TRUE, title = "L")
+plot_map(coords_ll, gwbss_res_1$scores_edges[20,,idx], map = map_df, quant = TRUE, title = "L")
+
+
+val2cl <- gwbss_res_1$scores_edges[,,idx]
+
+#fviz_nbclust(x = val2cl, FUNcluster=kmeans, k.max = 8, method = "silhouette")
+
+
+
+pheatmap((gwbss_res_1$scores_edges[,,1]), cluster_rows = TRUE, cluster_cols = FALSE) # clustering in j (in rows)
+
+
+cl     <- kmeans(gwbss_res_1$scores_edges[,,idx], 5, nstart = 100)
+valres <- lapply(unique(cl$cluster), function(cidx){ colMeans(val2cl[cl$cluster == cidx,]) })
+valres <- do.call("rbind", valres)
+
+plot_map(coords_ll, valres[5,], map = map_df, quant = TRUE, title = "L")
+pairs(t(valres))
+
+
+##  for time series 
+library("zoo")
+library("stochvol")
+data("exrates", package = "stochvol")
+times <- 500
+
+exrlogr <- zoo(apply(exrates[, -(ncol(exrates))], 2, logret))
+attr(exrlogr, "index") <- as.Date(rownames(exrlogr))
+exrlogr <- exrlogr[1:times,]
+exrlogr <- t(scale(t(exrlogr), center = TRUE, scale =FALSE))
+exrlogr <- scale((exrlogr), center = TRUE, scale = TRUE)
+#exrlogr <- exrlogr / max(exrlogr)
+exrlogr <- zoo(x = exrlogr)
+plot(exrlogr)
+
+#make graph
+gra <- make_ring(times, directed = FALSE, mutual = FALSE, circular = TRUE)
+weights_adj <- as_adjacency_matrix(gra)
+weights_adj <- as.matrix(weights_adj)
+
+
+nbr_nns <- 2
+grts <- grabss(x = as.matrix(exrlogr), 
+              weights_adj,
+              nbr_nns = nbr_nns,
+              spatial_mean = FALSE,
+              spatial_cov = TRUE, 
+              laplacian = TRUE,
+              spatial_laplacian = TRUE,
+              gammam = "unit",
+              gfun = function(x){x})
+
+val <- zoo(x = grts$scores_global)
+val <- zoo(x = grts$scores_ss)
+val <- zoo(x = (grts$scores_edges[,400:420,1]))      # i variert, j fixiert 
+
+#val <- zoo(x = t(rbind((grts$scores_edges[100,,1]),
+#                     (grts$scores_edges[100,,4]))) )  
+val <- zoo(x = t(grts$scores_edges[seq.int(1,300,10),,2]))  # i fixiert, j variert 
+
+plot(val)
+
+pheatmap((grts$scores_edges[,,1]), cluster_rows = FALSE, cluster_cols = FALSE)
+
+
+
+val2cl <- grts$scores_edges[,,idx]
+cl <- kmeans(val2cl, 5, nstart = 10)
+valres <- lapply(unique(cl$cluster), function(cidx){ colMeans(val2cl[cl$cluster == cidx,]) })
+valres <- do.call("rbind", valres)
+
+plot(zoo(x = t(valres)))
+
+
+
+##
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # data 
@@ -447,7 +666,7 @@ gwbss_res_1 <- grabss(x = elems_log,
                       weights_adj,
                       nbr_nns = nbr_nns,
                       spatial_mean = FALSE,
-                      spatial_cov = FALSE, 
+                      spatial_cov = TRUE, 
                       laplacian = TRUE,
                       spatial_laplacian = TRUE,
                       gfun = function(x){x})
