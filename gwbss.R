@@ -9,15 +9,17 @@ rowOrderAbs <- function(A, vrn) t(apply(A, 1, function(u){ vrn[order(abs(u), dec
 rowOrderPos <- function(A, vrn){t(apply(A, 1, function(u){ 
   #ind <- !is.na(ifelse(u>0,u,NA)); vrn[!ind] <- NA
   #vrn[ind] <- vrn[ind][order(u[ind], decreasing = TRUE)]
-  ind <- which(u > 0)
-  vrn <- vrn[order(abs(u), decreasing = TRUE)]
+  ord <- order(abs(u), decreasing = TRUE)
+  ind <- which(u[ord] > 0)
+  vrn <- vrn[ord]
   vrn[-ind] <- NA
   vrn }))}
 rowOrderNeg <- function(A, vrn){t(apply(A, 1, function(u){ 
   #ind <- !is.na(ifelse(u<0,u,NA)); vrn[!ind] <- NA
   #vrn[ind] <- vrn[ind][order(u[ind], decreasing = TRUE)] 
-  ind <- which(u < 0)
-  vrn <- vrn[order(abs(u), decreasing = TRUE)]
+  ord <- order(abs(u), decreasing = TRUE)
+  ind <- which(u[ord] < 0)
+  vrn <- vrn[ord]
   vrn[-ind] <- NA
   vrn }))}
 
