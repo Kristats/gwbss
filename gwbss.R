@@ -1,4 +1,9 @@
-library("plyr")
+library('abind')
+library("gridExtra")
+library("osmdata")
+library("cccd")
+library("Matrix")
+library("dplyr")
 
 
 # function to return maximum index of absolutes of each column of a matrix
@@ -7,16 +12,12 @@ rowOrderAbs <- function(A, vrn) t(apply(A, 1, function(u){ vrn[order(abs(u), dec
 
 # functions to return just negative and positive loadings 
 rowOrderPos <- function(A, vrn){t(apply(A, 1, function(u){ 
-  #ind <- !is.na(ifelse(u>0,u,NA)); vrn[!ind] <- NA
-  #vrn[ind] <- vrn[ind][order(u[ind], decreasing = TRUE)]
   ord <- order(abs(u), decreasing = TRUE)
   ind <- which(u[ord] > 0)
   vrn <- vrn[ord]
   vrn[-ind] <- NA
   vrn }))}
 rowOrderNeg <- function(A, vrn){t(apply(A, 1, function(u){ 
-  #ind <- !is.na(ifelse(u<0,u,NA)); vrn[!ind] <- NA
-  #vrn[ind] <- vrn[ind][order(u[ind], decreasing = TRUE)] 
   ord <- order(abs(u), decreasing = TRUE)
   ind <- which(u[ord] < 0)
   vrn <- vrn[ord]
@@ -139,11 +140,6 @@ S2_wvario_arr <- function(dat, k_mat, wt, eps){
   dd    <- as.vector(sqrt(wt_s)) * rhot
   sc    <- rel * sum(rhot * sqrt(wt_s))  # rel * sqrt(wt_s) %*% k_mat %*% sqrt(wt_s)
   if(sc == 0){ return( matrix(0,pl,pl))}
-
-  #s     <- lapply(1:rel, function(idx){  
-  #                         dat_loc <- sweep(dat_w[,,idx], 1, dd, "*")
-  #                         t(dat_loc) %*% dat_loc })
-  #s     <-  do.call("+",s)
   
   s     <- lapply(1:rel, function(idx){ t(dat_w[,,idx]) %*%  sweep(dat_w[,,idx], 1, dd, "*") })
   s     <-  do.call("+",s)
@@ -259,8 +255,16 @@ scatter2 <- function(xw, Lloc, laplacian){
 }
 
 
-# graph weighted bss 
-# if k_mat is provided then Mittinen scatter is used - weights are overwritten 
+# graph weighted bss - main function
+# x is the data matrix
+# weights_adj the adjacency matrix
+# nbr_nns a tuning parameter
+# if local_cen == TRUE then local mean is used
+# if local_cov == TRUE then local covariance is used
+# if laplacian == TRUE then the laplacian matrix is used as second scatter
+# else the adjacency matrix is used
+# if local_laplacian == TRUE then the localized secid scatters are used
+#  see paper for gammam
 grabss <- function(x,  
                   weights_adj,
                   nbr_nns = 2,
